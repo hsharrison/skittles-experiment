@@ -73,8 +73,8 @@ class TrackerJoint(EventDispatcher):
         self._raw_data = {}
         self._physical_markers_seen = set()
         self._initial_positions = defaultdict(list)
-        self._active_callback = self.get_marker_map
-        self._later_callbacks = deque([
+        self._callbacks = deque([
+            self.get_marker_map,
             self.register_raw_data,
         ])
 
@@ -91,14 +91,11 @@ class TrackerJoint(EventDispatcher):
         return self.history[-1]['radius']
 
     def handle_input(self, data, _):
-        result = self._active_callback(data, _)
+        if self._callbacks:
+            result = self._callbacks[0](data, _)
 
-        if result == 'COMPLETE':
-            try:
-                self._active_callback = self._later_callbacks.popleft()
-            except IndexError:
-                # No more callbacks, use a dummy.
-                self._active_callback = lambda _, __: None
+            if result == 'COMPLETE':
+                self._callbacks.popleft()
 
     @contextmanager
     def running(self):
