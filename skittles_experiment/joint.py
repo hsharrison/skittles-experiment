@@ -4,18 +4,69 @@ import functools
 import logging
 import time
 import numpy as np
+from pyglet.event import EVENT_UNHANDLED, EVENT_HANDLED, EventDispatcher
+from pyglet.window import mouse
 from touchtable.vrpn import PolhemusLibertyLatus, VrpnServer
 
 log = logging.getLogger(__name__)
 
 
-class TrackerJoint:
-    # Lower number tracker should be placed on pivot point.
-    initial_position_average_over_n_samples = 5
+class SkittlesController:
+    def __init__(self, skittles, joint):
+        self.skittles = skittles
+        self.joint = joint
 
-    def __init__(self, callback=None):
+    @property
+    def within_tolerance(self):
+        return abs(self.joint.history[0] - self.skittles.joint_angle) < self.skittles.settings['angle_tolerance']
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        # Do nothing if not left button.
+        if button is not mouse.LEFT:
+            return EVENT_UNHANDLED
+
+        if not self.joint.active:
+            return EVENT_UNHANDLED
+
+        if self.skittles.released:
+            return EVENT_UNHANDLED
+
+        if self.skittles.controlled:
+            # Should never happen this way.
+            return EVENT_UNHANDLED
+
+        if self.within_tolerance:
+            self.skittles.activate_paddle()
+            return EVENT_HANDLED
+
+        return EVENT_UNHANDLED
+
+    def on_mouse_release(self, x, y, button, modifiers):
+        if button is not mouse.LEFT:
+            return EVENT_UNHANDLED
+
+        if not self.joint.active:
+            return EVENT_UNHANDLED
+
+        if self.skittles.released:
+            return EVENT_UNHANDLED
+
+        if self.skittles.controlled:
+            self.skittles.release_ball()
+            return EVENT_HANDLED
+
+        return EVENT_UNHANDLED
+
+    def on_joint_move(self, d_angle):
+        if self.skittles.controlled:
+            self.skittles.angle += d_angle
+
+
+class TrackerJoint(EventDispatcher):
+    # Lower number tracker should be placed on pivot point.
+    def __init__(self):
         self.history = []
-        self.user_callback = callback
+        self.active = False
 
         self._marker_map = {}
         self._temporary_physical_marker_raw_data = {}
@@ -41,13 +92,20 @@ class TrackerJoint:
 
     def handle_input(self, data, _):
         result = self._active_callback(data, _)
+
         if result == 'COMPLETE':
-            self._active_callback = self._later_callbacks.popleft()
+            try:
+                self._active_callback = self._later_callbacks.popleft()
+            except IndexError:
+                # No more callbacks, use a dummy.
+                self._active_callback = lambda _, __: None
 
     @contextmanager
     def running(self):
         with VrpnServer(self._tracker, sentinel='ready'):
+            self.active = True
             yield
+            self.active = False
 
     def get_marker_map(self, data, _):
         physical_marker = data.pop('sensor', 0)
@@ -72,14 +130,12 @@ class TrackerJoint:
             return 'COMPLETE'
 
     def append_data(self, angle, radius):
+        self.dispatch_event('on_joint_move', angle - self.angle)
         self.history.append({
             'time': time.time(),
             'angle': angle,
             'radius': radius,
         })
-
-        if self.user_callback:
-            self.user_callback(angle)
 
     @extract_logical_marker
     def register_raw_data(self, marker, data):
