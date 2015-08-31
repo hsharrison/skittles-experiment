@@ -1,0 +1,17 @@
+name: skittles
+channels:
+  - hharrison
+dependencies:
+  - python=3.4.*
+  - numpy=1.9.*
+  - pandas=0.16.*
+  - vrpn=7.33.*
+  - pyyaml=3.11
+  - cytoolz=0.7.*
+  - networkx
+  - pip:
+    - pyglet==1.2.2
+    - cocos2d==0.6.3
+    - pyglet2d==0.2.1
+    - hg+https://bitbucket.org/hharrison/touch-table-experiments#egg=touchtable
+    - experimentator==0.3.*
