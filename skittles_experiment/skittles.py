@@ -95,6 +95,9 @@ class Skittles(Layer):
         self.release_angle = self.paddle_angle
         self.release_ang_vel = (self.paddle_angle - self.angle_history[reference_ix]) / dt
 
+        # Everything from here until update_ball_trajectory is in
+        # Sternad's coordinates: (0, 0) is center, down is negative.
+        # All else is (0, 0) at bottom left and positive going up and right.
         ball_pos = self.relative_position(self.ball.center)
         ball_vel = (ball_pos - self.relative_position(self.ball_pos_history[reference_ix])) / dt
 
