@@ -51,6 +51,7 @@ class Skittles(Layer):
 
     @paddle_angle.setter
     def paddle_angle(self, angle):
+        log.info('changing paddle angle to {}'.format(angle))
         self._rotate_paddle(angle - self.paddle_angle, with_ball=not self.released)
         self.time_history.append(time())
         self.angle_history.append(angle)
@@ -127,7 +128,6 @@ class Skittles(Layer):
 
     def _rotate_paddle(self, angle, with_ball=True):
         self.paddle.rotate(angle, center=self.pivot_point)
-        self.paddle_angle += angle
         if with_ball:
             self.ball.rotate(angle, center=self.pivot_point)
             self.ball_pos_history.append(self.ball.center)

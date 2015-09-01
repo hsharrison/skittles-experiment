@@ -18,26 +18,41 @@ class SkittlesController:
 
     @property
     def within_tolerance(self):
-        return abs(self.joint.history[0] - self.skittles.joint_angle) < self.skittles.settings['angle_tolerance']
+        first_angle = self.joint.history[0]['angle']
+        current_angle = self.joint.angle
+        log.info('checking tolerance...')
+        log.info('first angle  : {}'.format(first_angle))
+        log.info('current angle: {}'.format(current_angle))
+        within = abs(first_angle - current_angle) < self.skittles.settings['angle_tolerance']
+        log.info('within tolerance' if within else 'outside tolerance')
+        return within
 
     def on_mouse_press(self, x, y, button, modifiers):
+        log.info('detected mouse press')
         # Do nothing if not left button.
         if button is not mouse.LEFT:
+            log.debug('wrong mouse button')
             return EVENT_UNHANDLED
 
         if not self.joint.active:
+            log.debug('tracker not running')
             return EVENT_UNHANDLED
 
         if self.skittles.released:
+            log.debug('ball already released')
             return EVENT_UNHANDLED
 
         if self.skittles.controlled:
             # Should never happen this way.
+            log.debug('already controlled')
             return EVENT_UNHANDLED
 
         if self.within_tolerance:
+            log.info('activating paddle')
             self.skittles.activate_paddle()
             return EVENT_HANDLED
+        else:
+            log.debug('outside of tolerance')
 
         return EVENT_UNHANDLED
 
@@ -59,7 +74,22 @@ class SkittlesController:
 
     def on_joint_move(self, d_angle):
         if self.skittles.controlled:
-            self.skittles.angle += d_angle
+            self.skittles.paddle_angle += d_angle
+
+
+def extract_logical_marker(func):
+    """Change a method of TrackerJoint from the format
+    method(self, data, _)
+    into
+    method(self, logical_marker, data)
+
+    """
+    @functools.wraps(func)
+    def wrapped(self, data, _):
+        physical_marker = data.pop('sensor')
+        logical_marker = self._marker_map[physical_marker]
+        return func(self, logical_marker, data)
+    return wrapped
 
 
 class TrackerJoint(EventDispatcher):
@@ -78,7 +108,8 @@ class TrackerJoint(EventDispatcher):
             self.register_raw_data,
         ])
 
-        self._tracker = PolhemusLibertyLatus(2)
+        self._tracker = PolhemusLibertyLatus('polhemus', 2)
+        print()
         self._tracker.set_handler('position', self.handle_input)
         log.info('waiting to see all markers')
 
@@ -99,7 +130,7 @@ class TrackerJoint(EventDispatcher):
 
     @contextmanager
     def running(self):
-        with VrpnServer(self._tracker, sentinel='ready'):
+        with VrpnServer(self._tracker, wait=20):
             self.active = True
             yield
             self.active = False
@@ -127,7 +158,11 @@ class TrackerJoint(EventDispatcher):
             return 'COMPLETE'
 
     def append_data(self, angle, radius):
-        self.dispatch_event('on_joint_move', angle - self.angle)
+        try:
+            last_angle = self.angle
+        except IndexError:
+            last_angle = angle
+        self.dispatch_event('on_joint_move', angle - last_angle)
         self.history.append({
             'time': time.time(),
             'angle': angle,
@@ -142,6 +177,8 @@ class TrackerJoint(EventDispatcher):
             np.array(self._raw_data[1]['position']),
         ))
 
+TrackerJoint.register_event_type('on_joint_move')
+
 
 def angle_and_radius(fulcrum, tip):
     diff = tip - fulcrum
@@ -149,17 +186,3 @@ def angle_and_radius(fulcrum, tip):
     radius = np.linalg.norm(diff)
     return angle, radius
 
-
-def extract_logical_marker(func):
-    """Change a method of TrackerJoint from the format
-    method(self, data, _)
-    into
-    method(self, logical_marker, data)
-
-    """
-    @functools.wraps
-    def wrapped(self, data, _):
-        physical_marker = data.pop('sensor')
-        logical_marker = self.marker_map[physical_marker]
-        return func(self, logical_marker, data)
-    return wrapped
