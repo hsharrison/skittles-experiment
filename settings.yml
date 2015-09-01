@@ -1,0 +1,20 @@
+post_size: 15
+post_color: [100, 100, 100]
+target_color: [100, 0, 0]
+paddle_width: 4
+paddle_length: 20
+paddle_color_inactive: [50, 50, 50]
+paddle_color_active: [120, 120, 120]
+ball_radius: 5
+ball_color: [0, 0, 100]
+release_velocity_over_n_samples: 5
+
+initial_paddle_angle: 0
+angle_tolerance: 0.17
+
+ball_mass: 1
+spring_constant: 0.01
+frequency: 4
+relaxation_time: 3
+
+screen: 0
