@@ -27,6 +27,8 @@ def trial(*args, screen=0, **kwargs):
             with handlers(joint, controller):
                 director.run(Scene(skittles))
 
+    return skittles.release_angle, skittles.release_ang_vel, skittles.success
+
 
 @contextmanager
 def exclusive_mode():
@@ -63,7 +65,10 @@ def main():
     for color in ['post_color', 'target_color', 'paddle_color_inactive', 'paddle_color_active', 'ball_color']:
         settings[color] = tuple(settings[color])
 
-    trial([target_x, target_y], target_size, **settings)
+    angle, ang_vel, success = trial([target_x, target_y], target_size, **settings)
+    print('angle @ release:', angle)
+    print('angular velocity @ release:', ang_vel)
+    print('success': success)
 
 
 if __name__ == '__main__':
